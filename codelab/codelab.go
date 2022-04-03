@@ -254,6 +254,39 @@ func exercise4() {
 func exercise5() {
 	fmt.Println("=== Exercise 5: Building JSON ===\n")
 
+	env, _ := cel.NewEnv(
+		cel.Declarations(
+			decls.NewVar("now",
+				decls.Timestamp,
+			),
+		),
+	)
+
+	// Note the quoted keys in the CEL map literal. For proto messages the
+	// field names are unquoted as they represent well-defined identifiers.
+	ast := compile(env, `
+		{'sub': 'serviceAccount:delegate@acme.co',
+		'aud': 'my-project',
+		'iss': 'auth.acme.com:12350',
+		'iat': now,
+		'nbf': now,
+		'exp': now + duration('300s'),
+		'extra_claims': {
+				'group': 'admin'
+		}}`,
+		decls.NewMapType(decls.String, decls.Dyn),
+	)
+
+	program, _ := env.Program(ast)
+
+	out, _, _ := eval(
+		program,
+		map[string]interface{}{
+			"now": &tpb.Timestamp{Seconds: time.Now().Unix()},
+		},
+	)
+
+	fmt.Printf("------ type conversion ------\n%v\n", valueToJSON(out))
 	fmt.Println()
 }
 
