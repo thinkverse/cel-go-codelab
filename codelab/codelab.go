@@ -26,11 +26,10 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
-	_ "github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
-	_ "github.com/google/cel-go/interpreter/functions"
+	"github.com/google/cel-go/interpreter/functions"
 
 	"github.com/golang/glog"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -197,6 +196,54 @@ func exercise3() {
 // indicating whether the map contains the key-value pair.
 func exercise4() {
 	fmt.Println("=== Exercise 4: Customization ===\n")
+
+	// 1) Declare a paramaeterized map types used for
+	//    the `contains` function signature.
+	typeParamA := decls.NewTypeParamType("A")
+	typeParamB := decls.NewTypeParamType("B")
+	mapAB := decls.NewMapType(typeParamA, typeParamB)
+
+	// 2) Create a similar environment to exercises
+	// 		2 and 3 with the custom function.
+	env, _ := cel.NewEnv(
+		cel.Types(&rpcpb.AttributeContext_Request{}),
+		cel.Declarations(
+			decls.NewVar("request",
+				decls.NewObjectType("google.rpc.context.AttributeContext.Request"),
+			),
+			// 2.1) Declare the custom function.
+			decls.NewFunction("contains",
+				decls.NewParameterizedInstanceOverload(
+					"map_contains_key_value",
+					[]*exprpb.Type{mapAB, typeParamA, typeParamB},
+					decls.Bool,
+					[]string{"A", "B"},
+				),
+			),
+		),
+	)
+
+	// 3) Compile the expression into an AST.
+	ast := compile(env,
+		`request.auth.claims.contains('group', 'admin')`, decls.Bool,
+	)
+
+	// 4) Generate the program with a custom function implementation.
+	program, _ := env.Program(ast,
+		// 4.1) Implement the custom contains function.
+		cel.Functions(
+			&functions.Overload{
+				Operator: "map_contains_key_value",
+				Function: mapContainsKeyValue,
+			},
+		),
+	)
+
+	// 5) Create an empty claim map to use for testing purposes.
+	claims := map[string]string{}
+
+	// 6) Evaluate the program with a request containing the claims above.
+	eval(program, request(auth("user:me@acme.co", claims), time.Now()))
 
 	fmt.Println()
 }
