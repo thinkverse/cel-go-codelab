@@ -409,6 +409,40 @@ func exercise7() {
 func exercise8() {
 	fmt.Println("=== Exercise 8: Tuning ===")
 
+	// 1) Declare the x and 'y' variables as input into the expression.
+	env, _ := cel.NewEnv(
+		cel.Declarations(
+			decls.NewVar("x", decls.Int),
+			decls.NewVar("y", decls.Uint),
+		),
+	)
+
+	// 2) Compile the expression.
+	ast := compile(env, `x in [1, 2, 3, 4, 5]  && type(y) == uint`, decls.Bool)
+
+	// 3) Store truthy and falsey values for the expression.
+	truthyVars := map[string]interface{}{"x": int64(4), "y": uint64(2)}
+
+	// Turn on exhaustive eval to see what the evaluation state looks like.
+	// The input is structure to show a false on the first branch, and true
+	// on the second.
+	// falseyVars := map[string]interface{}{"x": uint64(1), "y": int64(3)}
+
+	// 3) Try the different cel.EvalOptions flags when evaluating this AST for
+	//    the following use cases:
+	//      - cel.OptOptimize: optimize the expression performance.
+	//      - cel.OptExhaustiveEval: turn off short-circuiting.
+	//      - cel.OptTrackState: track state and compute a residual using the
+	//        interpreter.PruneAst function
+	program, _ := env.Program(ast,
+		cel.EvalOptions(cel.OptOptimize),
+		// cel.EvalOptions(cel.OptExhaustiveEval),
+		// cel.EvalOptions(cel.OptTrackState),
+	)
+
+	// eval(program, cel.NoVars())
+	eval(program, truthyVars)
+
 	fmt.Println()
 }
 
