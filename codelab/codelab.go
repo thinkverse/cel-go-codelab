@@ -159,6 +159,35 @@ func exercise2() {
 func exercise3() {
 	fmt.Println("=== Exercise 3: Logical AND/OR ===\n")
 
+	// 1) Create the an equal environment to exercise2, omitting the error checking.
+	env, _ := cel.NewEnv(
+		cel.Types(&rpcpb.AttributeContext_Request{}),
+		cel.Declarations(
+			decls.NewVar("request",
+				decls.NewObjectType("google.rpc.context.AttributeContext.Request"),
+			),
+		),
+	)
+
+	// 2) Compile the expression into an AST with a logial AND/OR.
+	ast := compile(env,
+		`request.auth.claims.group == 'admin'
+			|| request.auth.principal == 'user:me@acme.co'`,
+		decls.Bool,
+	)
+
+	// 3) Generate the program for later evaluation, omitting the error checking.
+	program, _ := env.Program(ast)
+
+	// 4) Create an empty claim map to use for testing purposes.
+	claims := map[string]string{}
+
+	// 5) Create a String containing an auth user for testing.
+	principal := "other:me@acme.co"
+
+	// 6) Evaluate the program with a request containing the claims above.
+	eval(program, request(auth(principal, claims), time.Now()))
+
 	fmt.Println()
 }
 
