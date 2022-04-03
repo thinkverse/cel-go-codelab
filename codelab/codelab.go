@@ -109,6 +109,41 @@ func exercise1() {
 func exercise2() {
 	fmt.Println("=== Exercise 2: Variables ===\n")
 
+	// 1) Create the standard environment.
+	env, err := cel.NewEnv(
+		// 1.1) Bind the type rpc.context.AttributeContext.Request to our environment.
+		cel.Types(&rpcpb.AttributeContext_Request{}),
+
+		// 1.2) Declare a new variable named `request` of the type declared above.
+		cel.Declarations(
+			decls.NewVar("request",
+				decls.NewObjectType("google.rpc.context.AttributeContext.Request"),
+			),
+		),
+	)
+
+	// 2) Check that the expression compiles.
+	if err != nil {
+		glog.Exit(err)
+	}
+
+	// 3) Compile the expression into an AST.
+	ast := compile(env, `request.auth.claims.group == 'admin'`, decls.Bool)
+
+	// 4) Generate the program for later evaluation.
+	program, err := env.Program(ast)
+
+	// 5) Check that the program generated without errors.
+	if err != nil {
+		glog.Exitf("program error: %v", err)
+	}
+
+	// 6) Evaluate a request object that sets the proper group claim.
+	claims := map[string]string{"group": "admin"}
+
+	// 7) Evaluate the program with the claims as an argument.
+	eval(program, request(auth("user:me@acme.co", claims), time.Now()))
+
 	fmt.Println()
 }
 
