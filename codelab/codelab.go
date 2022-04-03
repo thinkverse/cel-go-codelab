@@ -298,6 +298,60 @@ func exercise5() {
 func exercise6() {
 	fmt.Println("=== Exercise 6: Building Protos ===")
 
+	// 1) Construct a new environment and indicate that the container for all
+	// references within the expression is `google.rpc.context.AttributeContext`.
+	attrCtxRequest := &rpcpb.AttributeContext_Request{}
+
+	env, _ := cel.NewEnv(
+		// Add cel.Container() option for 'google.rpc.context.AttributeContext'
+		cel.Container("google.rpc.context.AttributeContext.Request"),
+		cel.Types(attrCtxRequest),
+		cel.Declarations(
+			decls.NewVar("jwt", decls.NewMapType(decls.String, decls.Dyn)),
+			decls.NewVar("now", decls.Timestamp),
+		),
+	)
+
+	// 2) Compile the Request message construction expression and validate that
+	// the resulting expression type matches the fully qualified message name.
+	//
+	// Note: the field names within the proto message types are not quoted as they
+	// are well-defined names composed of valid identifier characters. Also, note
+	// that when building nested proto objects, the message name needs to prefix
+	// the object construction.
+	ast := compile(env, `
+		Request{
+			auth: Auth{
+				principal: jwt.iss + '/' + jwt.sub,
+				audiences: [jwt.aud],
+				presenter: 'azp' in jwt ? jwt.azp : "",
+				claims: jwt
+			},
+			time: now
+		}
+	`, decls.NewObjectType("google.rpc.context.AttributeContext.Request"))
+
+	program, _ := env.Program(ast)
+
+	// 3) Construct the message. The result is a ref.Val
+	// that returns a dynamic proto message.
+	out, _, _ := eval(program, map[string]interface{}{
+		"jwt": map[string]interface{}{
+			"sub": "serviceAccount:delegate@acme.co",
+			"aud": "my-project",
+			"iss": "auth.acme.com:12350",
+			"extra_claims": map[string]interface{}{
+				"group": "admin",
+			},
+		},
+		"now": &tpb.Timestamp{Seconds: time.Now().Unix()},
+	})
+
+	// Hint: Unwrap the CEL value to a proto. Make sure to use the
+	// `ConvertToNative(reflect.TypeOf(requestType))` to convert the dynamic proto
+	// message to the concrete proto message type expected.
+	fmt.Printf("------ type unwrap ------\n%v\n", valueToJSON(out))
+
 	fmt.Println()
 }
 
