@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/checker/decls"
 	_ "github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
@@ -58,6 +59,45 @@ func main() {
 // Compile, eval, profit!
 func exercise1() {
 	fmt.Println("=== Exercise 1: Hello World ===\n")
+
+	// 1) Create the standard environment.
+	env, err := cel.NewEnv()
+	if err != nil {
+		glog.Exitf("env error: %v", err)
+	}
+
+	// 2) Check that the expression compiles and returns a String.
+	ast, issues := env.Parse(`"Hello, World!"`)
+
+	// 3) Report syntactic errors, if present.
+	if issues.Err() != nil {
+		glog.Exit(issues.Err())
+	}
+
+	// 4) Type-check the expression for correctness.
+	checked, issues := env.Check(ast)
+
+	// 5) Report semantic errors, if present.
+	if issues.Err() != nil {
+		glog.Exit(issues.Err())
+	}
+
+	// 6) Check the result type is a String.
+	if !proto.Equal(checked.ResultType(), decls.String) {
+		glog.Exitf(
+			"Expected %v, got %v",
+			decls.String, checked.ResultType(),
+		)
+	}
+
+	// 7) Plan the program.
+	program, err := env.Program(checked)
+	if err != nil {
+		glog.Exitf("program error: %v", err)
+	}
+
+	// 8) Evaluate the program without additional arguments.
+	eval(program, cel.NoVars())
 
 	fmt.Println()
 }
