@@ -363,6 +363,38 @@ func exercise6() {
 func exercise7() {
 	fmt.Println("=== Exercise 7: Macros ===")
 
+	env, _ := cel.NewEnv(
+		// cel.ClearMacros(),
+		cel.Declarations(
+			decls.NewVar("jwt", decls.NewMapType(decls.String, decls.Dyn)),
+		),
+	)
+
+	ast := compile(env,
+		`jwt.extra_claims.exists(c, c.startsWith('group'))
+			&& jwt.extra_claims
+						.filter(c, c.startsWith('group'))
+						.all(c, jwt.extra_claims[c]
+											 .all(g, g.endsWith('@acme.co')))`,
+		decls.Bool)
+
+	program, _ := env.Program(ast)
+
+	// Evaluate a complex-ish JWT with two groups that satisfy the criteria.
+	// Output: true.
+	eval(program, map[string]interface{}{
+		"jwt": map[string]interface{}{
+			"sub": "serviceAccount:delegate@acme.co",
+			"aud": "my-project",
+			"iss": "auth.acme.com:12350",
+			"extra_claims": map[string][]string{
+				"group1": {"admin@acme.co", "analyst@acme.co"},
+				"lables": {"metadata", "prod", "pii"},
+				"groupN": {"forever@acme.co"},
+			},
+		},
+	})
+
 	fmt.Println()
 }
 
